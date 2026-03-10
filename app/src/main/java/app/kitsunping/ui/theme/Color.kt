@@ -1,0 +1,252 @@
+package app.kitsunping.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val ColorWhite = Color(0xFFFFFFFF)
+val ColorBlack = Color(0xFF000000)
+
+val OpenWrtBackground = Color(0xFFF4F7F9)
+val OpenWrtSurface = Color(0xFFFFFFFF)
+val OpenWrtSurfaceAlt = Color(0xFFEAF0F5)
+val OpenWrtBorder = Color(0xFFE1E8ED)
+val OpenWrtPrimary = Color(0xFF2C3E50)
+val OpenWrtAccent = Color(0xFF3498DB)
+val OpenWrtSuccess = Color(0xFF27AE60)
+val OpenWrtError = Color(0xFFE35D6A)
+val OpenWrtText = Color(0xFF1E2A36)
+val OpenWrtTextMuted = Color(0xFF667A8A)
+
+val DeepSpaceBackground = Color(0xFF0F1218)
+val DeepSpaceSurface = Color(0xFF1A1F28)
+val DeepSpaceSurfaceAlt = Color(0xFF232A36)
+val DeepSpaceBorder = Color(0xFF313A46)
+val DeepSpacePrimary = Color(0xFF6366F1)
+val DeepSpacePrimaryStrong = Color(0xFF4F46E5)
+val DeepSpaceSuccess = Color(0xFF00FF41)
+val DeepSpaceSuccessContainer = Color(0xFF0F2B1A)
+val DeepSpaceError = Color(0xFFF87171)
+val DeepSpaceText = Color(0xFFF8FAFC)
+val DeepSpaceTextMuted = Color(0xFFA1ADBD)
+
+val CyberStealthBackground = Color(0xFF0D0E12)
+val CyberStealthSurface = Color(0xFF171920)
+val CyberStealthSurfaceAlt = Color(0xFF20242C)
+val CyberStealthBorder = Color(0xFF313645)
+val CyberStealthPrimary = Color(0xFF8A2BE2)
+val CyberStealthPrimaryStrong = Color(0xFF9D4EFF)
+val CyberStealthSuccess = Color(0xFF00FF41)
+val CyberStealthSuccessContainer = Color(0xFF0A2612)
+val CyberStealthError = Color(0xFFFF6B6B)
+val CyberStealthText = Color(0xFFFFFFFF)
+val CyberStealthTextMuted = Color(0xFF9DA4B2)
+
+// New color themes
+
+val TerminalBackground = Color(0xFF111410)
+val TerminalSurface = Color(0xFF191D18)
+val TerminalSurfaceAlt = Color(0xFF232922)
+val TerminalBorder = Color(0xFF304032)
+val TerminalPrimary = Color(0xFF33FF00) // Phosphor green
+val TerminalPrimaryStrong = Color(0xFF00FF00)
+val TerminalSuccess = Color(0xFF33FF00)
+val TerminalSuccessContainer = Color(0xFF0D2B0D)
+val TerminalError = Color(0xFFFF3333)
+val TerminalText = Color(0xFFE4F2E8)
+val TerminalTextMuted = Color(0xFF94B49A)
+
+val CrimsonBackground = Color(0xFF141012)
+val CrimsonSurface = Color(0xFF1D1719)
+val CrimsonSurfaceAlt = Color(0xFF292023)
+val CrimsonBorder = Color(0xFF3A2930)
+val CrimsonPrimary = Color(0xFFE50914) // Vibrant red
+val CrimsonPrimaryStrong = Color(0xFFFF0A16)
+val CrimsonSuccess = Color(0xFF00D26A)
+val CrimsonSuccessContainer = Color(0xFF052414)
+val CrimsonError = Color(0xFFFF3B30)
+val CrimsonText = Color(0xFFEDEDED)
+val CrimsonTextMuted = Color(0xFFACA2A7)
+
+val SolarizedBackground = Color(0xFF002B36)
+val SolarizedSurface = Color(0xFF073642)
+val SolarizedSurfaceAlt = Color(0xFF0B4150)
+val SolarizedBorder = Color(0xFF1A4D5C)
+val SolarizedPrimary = Color(0xFF268BD2) // Soft blue
+val SolarizedPrimaryStrong = Color(0xFF2AA198) // Dark cyan
+val SolarizedSuccess = Color(0xFF859900)
+val SolarizedSuccessContainer = Color(0xFF1F382A)
+val SolarizedError = Color(0xFFDC322F)
+val SolarizedText = Color(0xFF839496)
+val SolarizedTextMuted = Color(0xFF586E75)
+
+val ArcticBackground = Color(0xFFF8FAFC)
+val ArcticSurface = Color(0xFFFFFFFF)
+val ArcticSurfaceAlt = Color(0xFFF1F5F9)
+val ArcticBorder = Color(0xFFE2E8F0)
+val ArcticPrimary = Color(0xFF0EA5E9) // Sky blue
+val ArcticPrimaryStrong = Color(0xFF0284C7)
+val ArcticSuccess = Color(0xFF10B981)
+val ArcticSuccessContainer = Color(0xFFD1FAE5)
+val ArcticError = Color(0xFFEF4444)
+val ArcticText = Color(0xFF0F172A)
+val ArcticTextMuted = Color(0xFF64748B)
+
+// Rose
+
+val RoseBackground = Color(0xFFFFF1F3)
+val RoseSurface = Color(0xFFFFEEF3)
+val RoseSurfaceAlt = Color(0xFFF8D9E4)
+val RoseBorder = Color(0xFFE6A8BF)
+val RosePrimary = Color(0xFFD63384) // Rose with better contrast
+val RosePrimaryStrong = Color(0xFFAD1457)
+val RoseSuccess = Color(0xFF34D399)
+val RoseSuccessContainer = Color(0xFFDCFCE7)
+val RoseError = Color(0xFFF87171)
+val RoseText = Color(0xFF4A1028)
+val RoseTextMuted = Color(0xFF7A4B63)
+
+// Modern black outline white, shadow white
+
+val ModernBackground = Color(0xFF0F1012)
+val ModernSurface = Color(0xFF191C20)
+val ModernSurfaceAlt = Color(0xFF25292E)
+val ModernBorder = Color(0xFFD8DDE3)
+val ModernPrimary = Color(0xFFF5F7FA)
+val ModernPrimaryStrong = Color(0xFFE7EBF0)
+val ModernSuccess = Color(0xFF00FF00) // Pure green
+val ModernSuccessContainer = Color(0xFF0A2612)
+val ModernError = Color(0xFFFF0000) // Pure red
+val ModernText = Color(0xFFF2F4F7)
+val ModernTextMuted = Color(0xFFA8B0BA)
+
+// Modern white outline black, shadow black
+
+val ModernInvertedBackground = Color(0xFFFFFFFF)
+val ModernInvertedSurface = Color(0xFFFFFFFF)
+val ModernInvertedSurfaceAlt = Color(0xFFF1F1F1)
+val ModernInvertedBorder = Color(0xFF000000)
+val ModernInvertedPrimary = Color(0xFF111111)
+val ModernInvertedPrimaryStrong = Color(0xFF000000)
+val ModernInvertedSuccess = Color(0xFF00FF00)
+val ModernInvertedSuccessContainer = Color(0xFF0A2612)
+val ModernInvertedError = Color(0xFFFF0000)
+val ModernInvertedText = Color(0xFF101010)
+val ModernInvertedTextMuted = Color(0xFF555555)
+
+// Forest - Dark theme based on greens
+val ForestBackground = Color(0xFF122016)
+val ForestSurface = Color(0xFF1B2B20)
+val ForestSurfaceAlt = Color(0xFF26382C)
+val ForestBorder = Color(0xFF39503F)
+val ForestPrimary = Color(0xFF4CAF50)
+val ForestPrimaryStrong = Color(0xFF2E7D32)
+val ForestSuccess = Color(0xFF81C784)
+val ForestSuccessContainer = Color(0xFF1A3B1A)
+val ForestError = Color(0xFFF44336)
+val ForestText = Color(0xFFE0E0E0)
+val ForestTextMuted = Color(0xFF9E9E9E)
+
+// Ocean - Deep blue theme
+val OceanBackground = Color(0xFF0B1824)
+val OceanSurface = Color(0xFF132435)
+val OceanSurfaceAlt = Color(0xFF1C3144)
+val OceanBorder = Color(0xFF2A465D)
+val OceanPrimary = Color(0xFF3A6EA5)
+val OceanPrimaryStrong = Color(0xFF1D4E7A)
+val OceanSuccess = Color(0xFF2ECC71)
+val OceanSuccessContainer = Color(0xFF0A3520)
+val OceanError = Color(0xFFE74C3C)
+val OceanText = Color(0xFFECF0F1)
+val OceanTextMuted = Color(0xFF7F8C8D)
+
+// Sunset - Warm orange/pink tones
+val SunsetBackground = Color(0xFF261B18)
+val SunsetSurface = Color(0xFF332522)
+val SunsetSurfaceAlt = Color(0xFF43312D)
+val SunsetBorder = Color(0xFF5C433E)
+val SunsetPrimary = Color(0xFFFF7043)
+val SunsetPrimaryStrong = Color(0xFFE65100)
+val SunsetSuccess = Color(0xFFF9A825)
+val SunsetSuccessContainer = Color(0xFF4A2C0A)
+val SunsetError = Color(0xFFD32F2F)
+val SunsetText = Color(0xFFFFF3E0)
+val SunsetTextMuted = Color(0xFFBCAAA4)
+
+// Monochrome - Pure grays
+val MonochromeBackground = Color(0xFF16181B)
+val MonochromeSurface = Color(0xFF1F2328)
+val MonochromeSurfaceAlt = Color(0xFF2B3138)
+val MonochromeBorder = Color(0xFF444C56)
+val MonochromePrimary = Color(0xFFB0B0B0)
+val MonochromePrimaryStrong = Color(0xFF8C8C8C)
+val MonochromeSuccess = Color(0xFF9CCC65)
+val MonochromeSuccessContainer = Color(0xFF1E2B1A)
+val MonochromeError = Color(0xFFEF5350)
+val MonochromeText = Color(0xFFF5F5F5)
+val MonochromeTextMuted = Color(0xFFA4ACB3)
+
+// Pastel - Soft light theme
+val PastelBackground = Color(0xFFFBF6EF)
+val PastelSurface = Color(0xFFFFFCF7)
+val PastelSurfaceAlt = Color(0xFFF1E3D3)
+val PastelBorder = Color(0xFFD7C2A8)
+val PastelPrimary = Color(0xFF7AA2D6)
+val PastelPrimaryStrong = Color(0xFF527FB8)
+val PastelSuccess = Color(0xFFB4E7CE)
+val PastelSuccessContainer = Color(0xFFD9F0E1)
+val PastelError = Color(0xFFD97A7A)
+val PastelText = Color(0xFF4D403A)
+val PastelTextMuted = Color(0xFF7F7268)
+
+// Dracula - Popular dark theme (purple/rose/cyan)
+val DraculaBackground = Color(0xFF2C2F39)
+val DraculaSurface = Color(0xFF373C48)
+val DraculaSurfaceAlt = Color(0xFF444958)
+val DraculaBorder = Color(0xFF575D6F)
+val DraculaPrimary = Color(0xFFBD93F9)
+val DraculaPrimaryStrong = Color(0xFFA875FF)
+val DraculaSuccess = Color(0xFF50FA7B)
+val DraculaSuccessContainer = Color(0xFF1D3A2A)
+val DraculaError = Color(0xFFFF5555)
+val DraculaText = Color(0xFFF8F8F2)
+val DraculaTextMuted = Color(0xFF9096A5)
+
+// Nord - Dark arctic theme (blue-green)
+val NordBackground = Color(0xFF2E3440)
+val NordSurface = Color(0xFF3B4252)
+val NordSurfaceAlt = Color(0xFF434C5E)
+val NordBorder = Color(0xFF4C566A)
+val NordPrimary = Color(0xFF88C0D0)
+val NordPrimaryStrong = Color(0xFF5E81AC)
+val NordSuccess = Color(0xFFA3BE8C)
+val NordSuccessContainer = Color(0xFF2A3A2A)
+val NordError = Color(0xFFBF616A)
+val NordText = Color(0xFFECEFF4)
+val NordTextMuted = Color(0xFFC7D0DD)
+
+// Mono Blueprint - High-contrast monochrome theme
+
+val MonoBlueprintBackground = Color(0xFF111318)
+val MonoBlueprintSurface = Color(0xFF1A1D23)
+val MonoBlueprintSurfaceAlt = Color(0xFF252A31)
+val MonoBlueprintBorder = Color(0xFFCBD3DB)
+val MonoBlueprintPrimary = Color(0xFFF1F4F7)
+val MonoBlueprintPrimaryStrong = Color(0xFFE2E8EE)
+val MonoBlueprintSuccess = Color(0xFFE8EEF3)
+val MonoBlueprintSuccessContainer = Color(0xFF0A1F0A) // Very dark green-gray container
+val MonoBlueprintError = Color(0xFFF1F4F7)
+val MonoBlueprintErrorContainer = Color(0xFF1F0A0A) // Very dark red-gray container
+val MonoBlueprintText = Color(0xFFEFF3F6)
+val MonoBlueprintTextMuted = Color(0xFF98A2AE)
+
+// Kitsunping - Custom black-based theme with bright accents
+val KitsunpingBackground = Color(0xFF0C0D12)
+val KitsunpingSurface = Color(0xFF191C22)
+val KitsunpingSurfaceAlt = Color(0xFF242933)
+val KitsunpingBorder = Color(0xFF353C49)
+val KitsunpingPrimary = Color(0xFF8A69FF)
+val KitsunpingPrimaryStrong = Color(0xFF7349F2)
+val KitsunpingSuccess = Color(0xFF27AE60) // Green (as in "Pending")
+val KitsunpingError = Color(0xFFE74C3C) // Red (like the border in "High" or "Failed")
+val KitsunpingWarning = Color(0xFFE3B849)
+val KitsunpingText = Color(0xFFF3F4F8)
+val KitsunpingTextMuted = Color(0xFFA4ACBA)
