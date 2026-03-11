@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_app_icon_bitmap"
+    android:insetLeft="256dp"
+    android:insetTop="256dp"
+    android:insetRight="256dp"
+    android:insetBottom="256dp" />

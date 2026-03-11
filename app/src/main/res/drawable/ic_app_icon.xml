@@ -6,9 +6,9 @@
         </shape>
     </item>
     <item
-        android:bottom="6dp"
-        android:left="6dp"
-        android:right="6dp"
-        android:top="6dp"
+        android:bottom="256dp"
+        android:left="256dp"
+        android:right="256dp"
+        android:top="256dp"
         android:drawable="@drawable/ic_app_icon_bitmap" />
 </layer-list>
