@@ -1684,7 +1684,7 @@ fun HomeScreen(
                         )
                     ) {
                         Text(
-                            text = "SIM LOW-NET ACTIVO (score/divisor=$lowNetDivisor)",
+                            text = "SIM LOW-NET Active (score/divisor=$lowNetDivisor)",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -1752,7 +1752,7 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     CardHeaderWithInfo(
-                        title = "Wi-Fi activo",
+                        title = "Wi-Fi details",
                         infoText = "Card prioritized when the active transport is Wi-Fi."
                     )
                     if (hasHardwareOptimized) {
@@ -1801,7 +1801,7 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CardHeaderWithInfo(
-                        title = "Transporte activo",
+                        title = "Active Transport",
                         infoText = "Summary of the transport currently detected by the daemon."
                     )
                     Text(text = transport.ifBlank { "none" }, style = MaterialTheme.typography.bodyMedium)
@@ -1815,7 +1815,7 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 CardHeaderWithInfo(
-                    title = "Quick actions",
+                    title = "Quick Actions",
                     infoText = "Daily module operations: calibration and profile switching."
                 )
                 Card(
@@ -3102,6 +3102,7 @@ private fun ChannelAnalysisDialog(
     val alreadyOnRecommended = recommendation != null &&
         activeCurrentChannel != null &&
         activeCurrentChannel == recommendation!!.channel
+    val canChangeChannel = recommendation != null && !alreadyOnRecommended
 
     LaunchedEffect(applyStatusTrigger) {
         if (applyStatusTrigger > 0) {
@@ -3116,7 +3117,7 @@ private fun ChannelAnalysisDialog(
             onDismissRequest = onDismiss,
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (recommendation != null && recommendation!!.scoreGap >= 5 && !alreadyOnRecommended) {
+                    if (canChangeChannel) {
                         Button(
                             onClick = { showConfirmation = true },
                             colors = ButtonDefaults.buttonColors(
@@ -3125,7 +3126,7 @@ private fun ChannelAnalysisDialog(
                         ) {
                             Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Change Channel")
+                            Text(if (recommendation!!.scoreGap >= 5) "Change Channel" else "Change Anyway")
                         }
                     }
                     Button(onClick = onDismiss) {

@@ -253,7 +253,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onRequestCheckDaemonPid = {
                         runRootCommandCapture(
-                            "Verificar PID daemon",
+                            "Check daemon PID",
                             """
                             PID_FILE=/data/adb/modules/Kitsunping/cache/daemon.pid
                             if [ ! -f "${'$'}PID_FILE" ]; then
@@ -274,10 +274,10 @@ class MainActivity : ComponentActivity() {
                             echo "pid=${'$'}PID"
                             echo "cmdline=${'$'}CMD"
                             if echo "${'$'}CMD" | grep -Eiq 'daemon|kitsunping'; then
-                                echo "OK: daemon inicializado"
+                                echo "OK: daemon initialized with PID ${'$'}PID"
                                 exit 0
                             fi
-                            echo "WARN: PID activo pero nombre no coincide con daemon/kitsunping"
+                            echo "WARN: PID active but name does not match daemon/kitsunping"
                             exit 2
                             """.trimIndent()
                         )
@@ -1071,20 +1071,73 @@ class MainActivity : ComponentActivity() {
     private fun extractPairCode(rawInput: String): String {
         val raw = rawInput.trim()
         if (raw.isBlank()) return ""
-        if (!raw.startsWith("kitsunping://pair")) return raw
-        return Uri.parse(raw).getQueryParameter("pc").orEmpty()
+
+        if (raw.startsWith("kitsunping://pair", ignoreCase = true)) {
+            val uri = Uri.parse(raw)
+            return uri.getQueryParameter("pc")
+                ?: uri.getQueryParameter("pair_code")
+                ?: uri.getQueryParameter("code")
+                ?: ""
+        }
+
+        if (raw.startsWith("{")) {
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (json != null) {
+                return json.optString("pc")
+                    .ifBlank { json.optString("pair_code") }
+                    .ifBlank { json.optString("code") }
+                    .trim()
+            }
+        }
+
+        if (raw.contains('=')) {
+            val parsed = runCatching { Uri.parse("x://x?$raw") }.getOrNull()
+            if (parsed != null) {
+                return parsed.getQueryParameter("pc")
+                    ?: parsed.getQueryParameter("pair_code")
+                    ?: parsed.getQueryParameter("code")
+                    ?: raw.substringAfter('=').trim()
+            }
+        }
+
+        return raw
     }
 
     private fun extractRouterIdFromPairUri(rawInput: String): String {
         val raw = rawInput.trim()
-        if (raw.isBlank() || !raw.startsWith("kitsunping://pair")) return ""
+        if (raw.isBlank() || !raw.startsWith("kitsunping://pair", ignoreCase = true)) return ""
         return Uri.parse(raw).getQueryParameter("rid").orEmpty()
     }
 
     private fun extractRouterIpFromPairUri(rawInput: String): String {
         val raw = rawInput.trim()
-        if (raw.isBlank() || !raw.startsWith("kitsunping://pair")) return ""
-        return Uri.parse(raw).getQueryParameter("ip").orEmpty()
+        if (raw.isBlank() || !raw.startsWith("kitsunping://pair", ignoreCase = true)) return ""
+        val uri = Uri.parse(raw)
+        return uri.getQueryParameter("ip")
+            ?: uri.getQueryParameter("router_ip")
+            ?: uri.getQueryParameter("host")
+            ?: ""
+    }
+
+    private fun extractPairExpiryEpoch(rawInput: String): Long? {
+        val raw = rawInput.trim()
+        if (raw.isBlank()) return null
+
+        if (raw.startsWith("kitsunping://pair", ignoreCase = true)) {
+            return Uri.parse(raw).getQueryParameter("exp")?.toLongOrNull()
+        }
+
+        if (raw.startsWith("{")) {
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            return json?.optString("exp")?.toLongOrNull()
+        }
+
+        if (raw.contains('=')) {
+            val parsed = runCatching { Uri.parse("x://x?$raw") }.getOrNull()
+            return parsed?.getQueryParameter("exp")?.toLongOrNull()
+        }
+
+        return null
     }
 
     private fun handlePairPayload(rawInput: String) {
@@ -1110,7 +1163,7 @@ class MainActivity : ComponentActivity() {
         return token.all { it in '0'..'9' || it in 'a'..'f' }
     }
 
-    private fun postPairValidate(endpoint: String, payload: JSONObject): Pair<Int, String> {
+    private fun postPairValidate(endpoint: String, payload: JSONObject, authToken: String? = null): Pair<Int, String> {
         return runCatching {
             val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -1118,13 +1171,30 @@ class MainActivity : ComponentActivity() {
                 readTimeout = 3000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
+                if (!authToken.isNullOrBlank()) {
+                    setRequestProperty("X-Auth-Token", authToken)
+                }
             }
             conn.outputStream.use { it.write(payload.toString().toByteArray()) }
             val code = conn.responseCode
             val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
             code to body
-        }.getOrElse { -1 to (it.message ?: "network_error") }
+        }.getOrElse {
+            val kind = it::class.java.simpleName
+            val msg = it.message.orEmpty().ifBlank { "network_error" }
+            val cause = it.cause?.message.orEmpty()
+            val detail = buildString {
+                append(kind)
+                append(": ")
+                append(msg)
+                if (cause.isNotBlank()) {
+                    append(" | cause=")
+                    append(cause)
+                }
+            }
+            -1 to detail
+        }
     }
 
     private fun buildRouterBases(routerInput: String): List<String> {
@@ -1188,10 +1258,14 @@ class MainActivity : ComponentActivity() {
         return endpoints.distinct()
     }
 
-    private fun pairValidateWithFallback(routerIp: String, payload: JSONObject): Triple<String, Int, String> {
+    private fun pairValidateWithFallback(
+        routerIp: String,
+        payloads: List<JSONObject>,
+        authToken: String?
+    ): Triple<String, Int, String> {
         val endpoints = buildRouterEndpoints(
             routerIp,
-            listOf("/cgi-bin/router-pair-validate", "/router_agent/pair_validate")
+            listOf("/cgi-bin/router-pair-validate")
         )
 
         if (endpoints.isEmpty()) {
@@ -1200,19 +1274,101 @@ class MainActivity : ComponentActivity() {
 
         var lastEndpoint = endpoints.first()
         var lastResponse: Pair<Int, String> = -1 to "network_error"
+        var bestEndpoint = lastEndpoint
+        var bestResponse: Pair<Int, String>? = null
+
+        val validToken = authToken?.trim()?.lowercase()?.takeIf { isValidRouterToken(it) }
+        val authVariants = if (validToken != null) listOf<String?>(null, validToken) else listOf<String?>(null)
+
         for (endpoint in endpoints) {
-            val response = postPairValidate(endpoint, payload)
-            lastEndpoint = endpoint
-            lastResponse = response
-            val code = response.first
-            if (code in 200..299) {
-                break
-            }
-            if (code in listOf(400, 401, 403, 409, 410, 415)) {
-                break
+            payloads.forEachIndexed { _, payload ->
+                for (token in authVariants) {
+                    val response = postPairValidate(endpoint, payload, token)
+                    lastEndpoint = endpoint
+                    lastResponse = response
+                    val code = response.first
+
+                    // Prefer any concrete HTTP response over transport-level failures.
+                    if (code != -1) {
+                        bestEndpoint = endpoint
+                        bestResponse = response
+                    }
+
+                    if (code in 200..299) {
+                        return Triple(lastEndpoint, code, response.second)
+                    }
+                    // Stop only on strict malformed/unsupported request.
+                    if (code in listOf(400, 415)) {
+                        break
+                    }
+
+                    // If canonical endpoint already gave a deterministic pair/auth outcome,
+                    // do not continue into HTTPS fallbacks that can end in SSL -1 noise.
+                    if (
+                        endpoint.contains("/cgi-bin/router-pair-validate") &&
+                        code in listOf(401, 403, 409, 410)
+                    ) {
+                        return Triple(endpoint, code, response.second)
+                    }
+                }
             }
         }
-        return Triple(lastEndpoint, lastResponse.first, lastResponse.second)
+        val finalEndpoint = bestResponse?.let { bestEndpoint } ?: lastEndpoint
+        val finalResponse = bestResponse ?: lastResponse
+        return Triple(finalEndpoint, finalResponse.first, finalResponse.second)
+    }
+
+    private fun buildPairErrorMessage(
+        code: Int,
+        endpointUsed: String,
+        body: String,
+        pairExpiryEpoch: Long? = null
+    ): String {
+        val detail = body.trim()
+        if (code == -1 && detail.contains("trust anchor", ignoreCase = true)) {
+            return "pair failed: HTTPS certificate is not trusted on router. Use HTTP pairing endpoint or install a trusted certificate."
+        }
+        if (code == -1 && detail.contains("cleartext", ignoreCase = true)) {
+            return "pair failed: Android blocked cleartext HTTP. Reinstall the app with cleartext enabled."
+        }
+
+        if (code == 410) {
+            val normalized = detail.lowercase()
+            val nowSec = System.currentTimeMillis() / 1000
+            val qrHint = when {
+                pairExpiryEpoch == null -> ""
+                pairExpiryEpoch <= nowSec -> {
+                    val delta = (nowSec - pairExpiryEpoch).coerceAtLeast(0)
+                    " QR expired ${delta}s ago."
+                }
+                else -> {
+                    val delta = (pairExpiryEpoch - nowSec).coerceAtLeast(0)
+                    " QR says ${delta}s left; router clock may be ahead."
+                }
+            }
+            val hint = when {
+                normalized.contains("pair_expired") -> "Pair code expired. Generate a new code on router and retry.$qrHint"
+                normalized.contains("pair_not_requested") -> "No active pair request on router. Generate a new code and retry."
+                else -> "Pair code is no longer valid. Generate a new code on router and retry.$qrHint"
+            }
+            return "pair failed (410): $hint"
+        }
+
+        if (code == 403) {
+            val normalized = detail.lowercase()
+            val hint = when {
+                normalized.contains("missing_token") || normalized.contains("forbidden") || normalized.contains("invalid_token_format") ->
+                    "Router denied this endpoint. Update/reinstall router agent and regenerate pair code."
+                normalized.contains("localhost_only") ->
+                    "Router endpoint is localhost-only. Use the public pair CGI endpoint and regenerate pair code."
+                else ->
+                    "Router refused pairing request. Regenerate pair code and verify router agent is updated."
+            }
+            val extra = detail.take(80)
+            return "pair failed (403): $hint [$endpointUsed] ${if (extra.isBlank()) "" else extra}"
+        }
+
+        return "pair failed ($code) [$endpointUsed]: ${detail.take(160)}"
     }
 
     private fun setPairedProperty(value: Boolean) {
@@ -1231,14 +1387,19 @@ class MainActivity : ComponentActivity() {
 
         val daemon = snapshot.daemonState
         val policyVersion = readPolicyVersionFromModule()
+        val priorityTarget = resolvePriorityTargetForSnapshot(snapshot)
+        val profileCurrentForRouter = normalizeProfileForRouter(snapshot.policyCurrent)
+        val profileTargetForRouter = normalizeProfileForRouter(snapshot.policyTarget)
+        val profileRequestForRouter = normalizeProfileForRouter(snapshot.policyRequest)
         val payload = JSONObject()
             .put("event", "MODULE_STATUS")
             .put("router_id", state.routerId)
             .put("version", policyVersion)
             .put("paired", state.paired)
-            .put("profile_current", snapshot.policyCurrent)
-            .put("profile_target", snapshot.policyTarget)
-            .put("profile_request", snapshot.policyRequest)
+            .put("profile_current", profileCurrentForRouter)
+            .put("profile_target", profileTargetForRouter)
+            .put("profile_request", profileRequestForRouter)
+            .put("priority_target", priorityTarget)
             .put("transport", daemon["transport"].orEmpty())
             .put("iface", daemon["iface"].orEmpty())
             .put("wifi_state", daemon["wifi.state"].orEmpty())
@@ -1294,16 +1455,85 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun resolvePriorityTargetForSnapshot(snapshot: ModuleSnapshot): String {
+        val targetProfile = snapshot.policyTarget.ifBlank {
+            snapshot.policyRequest.ifBlank { snapshot.policyCurrent }
+        }.let { normalizeProfileForPolicyMatch(it) }
+        if (targetProfile.isBlank()) return "medium"
+
+        val candidates = buildList {
+            runtimePolicies.values.forEach { rule ->
+                if (
+                    rule.enabled &&
+                    normalizeProfileForPolicyMatch(rule.profile) == targetProfile
+                ) {
+                    add(rule.priority)
+                }
+            }
+            appPolicies.values.forEach { rule ->
+                if (
+                    rule.enabled &&
+                    normalizeProfileForPolicyMatch(rule.profile) == targetProfile
+                ) {
+                    add(rule.priority)
+                }
+            }
+        }
+
+        if (candidates.isEmpty()) return "medium"
+
+        val normalized = candidates.mapNotNull { normalizePriorityValue(it) }
+        if (normalized.isEmpty()) return "medium"
+
+        return when {
+            normalized.contains("high") -> "high"
+            normalized.contains("medium") -> "medium"
+            else -> "low"
+        }
+    }
+
+    private fun normalizePriorityValue(value: String?): String? {
+        return when (value.orEmpty().trim().lowercase()) {
+            "low", "medium", "high" -> value.orEmpty().trim().lowercase()
+            else -> null
+        }
+    }
+
+    private fun normalizeProfileForPolicyMatch(value: String?): String {
+        val normalized = value.orEmpty()
+            .trim()
+            .lowercase()
+            .replace(' ', '_')
+            .replace('-', '_')
+        return when (normalized) {
+            "benchmark", "benchmark_gaming", "bench_ping", "benchmarkping" -> "benchmark_gaming"
+            "benchmark_speed", "bench_speed", "benchmarks", "benchmarkspeed" -> "benchmark_speed"
+            "normal" -> "stable"
+            "stable", "speed", "gaming" -> normalized
+            else -> normalized
+        }
+    }
+
+    private fun normalizeProfileForRouter(value: String?): String {
+        return when (normalizeProfileForPolicyMatch(value)) {
+            "benchmark_gaming", "benchmark_speed" -> "benchmark"
+            else -> value.orEmpty().trim().lowercase().replace(' ', '_').replace('-', '_')
+        }
+    }
+
     private fun pairRouter(routerIp: String, qrOrCode: String) {
-        val ip = routerIp.trim().ifBlank { extractRouterIpFromPairUri(qrOrCode) }
+        val ip = routerIp.trim().ifBlank {
+            extractRouterIpFromPairUri(qrOrCode).ifBlank { routerPairing.routerIp.trim() }
+        }
         val pairCode = extractPairCode(qrOrCode)
         val routerIdFromQr = extractRouterIdFromPairUri(qrOrCode)
+        val pairExpiryEpoch = extractPairExpiryEpoch(qrOrCode)
         if (ip.isBlank()) {
             runOnUiThread { Toast.makeText(this, "router_ip is required", Toast.LENGTH_LONG).show() }
             return
         }
         if (pairCode.isBlank()) {
-            runOnUiThread { Toast.makeText(this, "codigo/QR invalido", Toast.LENGTH_LONG).show() }
+            runOnUiThread { Toast.makeText(this, "Invalid code/QR payload", Toast.LENGTH_LONG).show() }
             return
         }
 
@@ -1312,19 +1542,28 @@ class MainActivity : ComponentActivity() {
                 ?: Build.MODEL ?: "android"
             val payload = JSONObject()
                 .put("pair_code", pairCode)
+                .put("code", pairCode)
+                .put("device_id", deviceId)
+            val payloadWithRouterId = JSONObject(payload.toString()).apply {
+                if (routerIdFromQr.isNotBlank()) {
+                    put("router_id", routerIdFromQr)
+                    put("rid", routerIdFromQr)
+                }
+            }
+            val legacyPayload = JSONObject()
+                .put("code", pairCode)
                 .put("device_id", deviceId)
 
-            val response = pairValidateWithFallback(ip, payload)
+            val response = pairValidateWithFallback(
+                ip,
+                listOf(payload, payloadWithRouterId, legacyPayload),
+                routerPairing.token
+            )
 
             runOnUiThread {
                 val (endpointUsed, code, body) = response
                 if (code !in 200..299) {
-                    val detail = body.trim()
-                    val errorMsg = if (code == -1 && detail.contains("cleartext", ignoreCase = true)) {
-                        "pair failed: Android blocked cleartext HTTP. Reinstall the app with cleartext enabled."
-                    } else {
-                        "pair failed ($code) [$endpointUsed]: ${detail.take(160)}"
-                    }
+                    val errorMsg = buildPairErrorMessage(code, endpointUsed, body, pairExpiryEpoch)
                     Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
                     return@runOnUiThread
                 }
@@ -1353,7 +1592,7 @@ class MainActivity : ComponentActivity() {
                     }.start()
                     Toast.makeText(this, "PAIR_OK: paired", Toast.LENGTH_LONG).show()
                 } else {
-                    Toast.makeText(this, "pair invalido: ${status.ifBlank { body }}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Invalid pair response: ${status.ifBlank { body }}", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
