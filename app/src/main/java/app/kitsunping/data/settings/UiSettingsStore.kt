@@ -23,9 +23,18 @@ class UiSettingsStore(context: Context) {
         prefs.edit().putBoolean(KEY_DEVELOPER_MODE, enabled).apply()
     }
 
+    fun loadReducedMotionEnabled(): Boolean {
+        return prefs.getBoolean(KEY_REDUCED_MOTION, false)
+    }
+
+    fun saveReducedMotionEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_REDUCED_MOTION, enabled).apply()
+    }
+
     private companion object {
         private const val PREFS_UI = "kitsunping_ui"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DEVELOPER_MODE = "developer_mode"
+        private const val KEY_REDUCED_MOTION = "reduced_motion"
     }
 }

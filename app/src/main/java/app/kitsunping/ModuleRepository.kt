@@ -17,6 +17,8 @@ class ModuleRepository(context: Context) {
                 PATH_POLICY_TARGET,
                 PATH_POLICY_REQUEST,
                 PATH_TARGET_STATE_HISTORY,
+                PATH_CONFLICTS_STATE,
+                PATH_CONFLICTS_REPORT,
                 PATH_PROC_NET_ROUTE
             )
         )
@@ -32,6 +34,10 @@ class ModuleRepository(context: Context) {
         val policyCurrent = reads[PATH_POLICY_CURRENT]?.trim().orEmpty()
         val policyTarget = reads[PATH_POLICY_TARGET]?.trim().orEmpty()
         val policyRequest = reads[PATH_POLICY_REQUEST]?.trim().orEmpty()
+        val conflictStatus = parseConflictStatus(
+            statePayload = reads[PATH_CONFLICTS_STATE],
+            reportPayload = reads[PATH_CONFLICTS_REPORT]
+        )
         val targetState = resolveTargetState(daemonState, policyEventJson)
         val targetStateReason = resolveTargetStateReason(daemonState, policyEventJson)
         val targetStateHistory = reads[PATH_TARGET_STATE_HISTORY]
@@ -52,10 +58,69 @@ class ModuleRepository(context: Context) {
             policyCurrent = policyCurrent,
             policyTarget = policyTarget,
             policyRequest = policyRequest,
+            conflictStatus = conflictStatus,
             targetState = targetState,
             targetStateReason = targetStateReason,
             targetStateHistory = targetStateHistory
         )
+    }
+
+    private fun parseConflictStatus(statePayload: String?, reportPayload: String?): ConflictStatus {
+        val stateMap = parseKeyValue(statePayload)
+        val highestRisk = stateMap["highest_risk"].orEmpty().ifBlank { "none" }.lowercase()
+        val modulesScanned = stateMap["modules_scanned"]?.toIntOrNull() ?: 0
+        val highModules = stateMap["high_modules"]?.toIntOrNull() ?: 0
+        val mediumModules = stateMap["medium_modules"]?.toIntOrNull() ?: 0
+        val lowModules = stateMap["low_modules"]?.toIntOrNull() ?: 0
+
+        val moduleHits = reportPayload
+            ?.lineSequence()
+            ?.mapNotNull { parseConflictModuleLine(it) }
+            ?.sortedWith(
+                compareByDescending<ConflictModuleHit> { riskPriority(it.risk) }
+                    .thenByDescending { it.highHits }
+                    .thenByDescending { it.mediumHits }
+                    .thenBy { it.module }
+            )
+            ?.take(3)
+            ?.toList()
+            ?: emptyList()
+
+        return ConflictStatus(
+            highestRisk = highestRisk,
+            modulesScanned = modulesScanned,
+            highModules = highModules,
+            mediumModules = mediumModules,
+            lowModules = lowModules,
+            topModules = moduleHits
+        )
+    }
+
+    private fun parseConflictModuleLine(line: String): ConflictModuleHit? {
+        if (!line.startsWith("module=")) return null
+        val fields = line.trim().split(Regex("\\s+"))
+            .mapNotNull { token ->
+                val idx = token.indexOf('=')
+                if (idx <= 0) null else token.substring(0, idx) to token.substring(idx + 1)
+            }
+            .toMap()
+
+        val module = fields["module"].orEmpty().trim()
+        if (module.isBlank()) return null
+
+        return ConflictModuleHit(
+            module = module,
+            risk = fields["risk"].orEmpty().ifBlank { "low" }.lowercase(),
+            highHits = fields["high_hits"]?.toIntOrNull() ?: 0,
+            mediumHits = fields["medium_hits"]?.toIntOrNull() ?: 0
+        )
+    }
+
+    private fun riskPriority(risk: String): Int = when (risk.lowercase()) {
+        "high" -> 3
+        "medium" -> 2
+        "low" -> 1
+        else -> 0
     }
 
     private fun resolveTargetState(
@@ -176,6 +241,8 @@ class ModuleRepository(context: Context) {
         const val PATH_POLICY_TARGET = "$PATH_CACHE/policy.target"
         const val PATH_POLICY_REQUEST = "$PATH_CACHE/policy.request"
         const val PATH_TARGET_STATE_HISTORY = "$PATH_CACHE/target.state.history"
+        const val PATH_CONFLICTS_STATE = "$PATH_CACHE/conflicts.state"
+        const val PATH_CONFLICTS_REPORT = "$PATH_LOGS/conflicts_report.log"
         const val PATH_RESULTS_ENV = "$PATH_LOGS/results.env"
     }
 }

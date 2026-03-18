@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
     private var advancedDialog by mutableStateOf<AdvancedDialog?>(null)
     private var highlightPulse by mutableStateOf(false)
     private var appThemeMode by mutableStateOf(AppThemeMode.KITSUNPING)
+    private var reducedMotionEnabled by mutableStateOf(false)
     private var developerMode by mutableStateOf(false)
     private var routerPairing by mutableStateOf(RouterPairingState())
     private var routerSignatureUi by mutableStateOf(RouterSignatureUi())
@@ -65,6 +66,9 @@ class MainActivity : ComponentActivity() {
     private var policyApplyInProgress by mutableStateOf(false)
     private var policyApplyQueued = false
     private var pendingPolicySyncRunnable: Runnable? = null
+    private var moduleIntegrityViewVisible by mutableStateOf(false)
+    private var moduleIntegrityViewLoading by mutableStateOf(false)
+    private var moduleIntegrityViewReport by mutableStateOf("Verifying integrity of module ...")
     private var scannedPairPayload by mutableStateOf("")
     private var lowNetworkSimulationEnabled by mutableStateOf(false)
     private var ipv6CalibrationEnabled by mutableStateOf(false)
@@ -77,6 +81,7 @@ class MainActivity : ComponentActivity() {
     private var lastRouterSyncMs: Long = 0L
     private var lastRouterSyncPayloadHash: Int = 0
     private var routerStatusSeq: Long = 0L
+    private var lastProcessedChannelApplyTs: Long = 0L
 
     private val clearPulse = Runnable { highlightPulse = false }
     private val refreshHandler = Handler(Looper.getMainLooper())
@@ -150,10 +155,6 @@ class MainActivity : ComponentActivity() {
                     ).toJsonString()
                 )
             }
-            Thread {
-                val snapshot = repository.loadSnapshot()
-                NotificationHelper.handleSnapshot(this@MainActivity, snapshot)
-            }.start()
             refreshSnapshot()
         }
     }
@@ -193,6 +194,7 @@ class MainActivity : ComponentActivity() {
             speedTestState = state
         }
         appThemeMode = uiSettingsStore.loadThemeMode()
+        reducedMotionEnabled = uiSettingsStore.loadReducedMotionEnabled()
         developerMode = uiSettingsStore.loadDeveloperMode()
         routerPairing = loadRouterPairingState()
         routerStatusSeq = loadRouterStatusSeq()
@@ -214,6 +216,7 @@ class MainActivity : ComponentActivity() {
                     routerFiles = routerFiles,
                     advancedDialog = advancedDialog,
                     currentThemeMode = appThemeMode,
+                    reducedMotionEnabled = reducedMotionEnabled,
                     developerMode = developerMode,
                     routerPaired = routerPairing.paired,
                     routerIp = routerPairing.routerIp,
@@ -229,8 +232,12 @@ class MainActivity : ComponentActivity() {
                     runtimePolicies = runtimePolicies,
                     policySyncSummary = policySyncSummary,
                     policyApplyInProgress = policyApplyInProgress,
+                    moduleIntegrityViewVisible = moduleIntegrityViewVisible,
+                    moduleIntegrityViewLoading = moduleIntegrityViewLoading,
+                    moduleIntegrityViewReport = moduleIntegrityViewReport,
                     speedTestState = speedTestState,
                     onDismissDialog = { advancedDialog = null },
+                    onDismissModuleIntegrityView = { moduleIntegrityViewVisible = false },
                     onRequestCalibrate = {
                         sendPolicyEvent("user_requested_calibrate", null)
                         runRootCommands(
@@ -293,6 +300,7 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     onRequestThemeMode = { updateThemeMode(it) },
+                    onRequestReducedMotion = { updateReducedMotion(it) },
                     onRequestDeveloperMode = { updateDeveloperMode(it) },
                     lowNetworkSimulationEnabled = lowNetworkSimulationEnabled,
                     onRequestLowNetworkSimulation = { updateLowNetworkSimulation(it) },
@@ -336,15 +344,10 @@ class MainActivity : ComponentActivity() {
                                 "resetprop persist.kitsuneping.user_event channel_change_request || setprop persist.kitsuneping.user_event channel_change_request"
                             )
                         )
+                        schedulePostChannelChangeRefresh()
                     },
                     onReadChannelApplyStatus = {
-                        try {
-                            val statusPath = "/sdcard/kitsunping_cache/router_channel_apply_response.json"
-                            val result = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat $statusPath")).inputStream.bufferedReader().use { it.readText() }
-                            if (result.isNotBlank()) result else null
-                        } catch (e: Exception) {
-                            null
-                        }
+                        readChannelApplyStatusRaw()
                     },
                     onRequestOpenAppSettings = { openAppSettings() },
                     onRequestRefreshRouterFiles = { refreshRouterFiles() },
@@ -352,9 +355,13 @@ class MainActivity : ComponentActivity() {
                     onRequestViewRouterLast = { showRouterLastView() },
                     onRequestOpenRouterLast = { openRouterLastTarget() },
                     onRequestRunCommand = { title, cmd -> runRootCommandCapture(title, cmd) },
+                    onRequestModuleIntegrityCheck = { runModuleIntegrityCheck() },
                     onRequestRunSpeedTest = { config: SpeedTestRunConfig -> speedTestRunner.start(config) },
                     onRequestSaveAppPolicy = { packageName, profile, priority, enabled ->
                         saveAppPolicy(packageName, profile, priority, enabled)
+                    },
+                    onRequestDeleteAppPolicy = { packageName ->
+                        deleteAppPolicy(packageName)
                     },
                     onRequestApplyPolicies = {
                         applyPolicyModelToRuntime()
@@ -417,6 +424,7 @@ class MainActivity : ComponentActivity() {
             val snapshot = repository.loadSnapshot().copy(
                 daemonRuntime = inspectDaemonRuntime()
             )
+            NotificationHelper.handleSnapshot(this@MainActivity, snapshot)
             pushModuleStatusToRouter(snapshot)
             syncRouterPairingFromModule()
             runOnUiThread {
@@ -582,6 +590,69 @@ class MainActivity : ComponentActivity() {
         refreshSnapshot()
         refreshHandler.postDelayed({ refreshSnapshot() }, 1500L)
         refreshHandler.postDelayed({ refreshSnapshot() }, 4500L)
+    }
+
+    private fun schedulePostChannelChangeRefresh() {
+        refreshSnapshot()
+        refreshRouterFiles()
+        refreshHandler.postDelayed({
+            refreshSnapshot()
+            refreshRouterFiles()
+        }, 3000L)
+        refreshHandler.postDelayed({
+            refreshSnapshot()
+            refreshRouterFiles()
+        }, 9000L)
+        refreshHandler.postDelayed({
+            refreshSnapshot()
+            refreshRouterFiles()
+        }, 15000L)
+    }
+
+    private fun normalizeRouterBand(raw: String): String {
+        return when (raw.trim().lowercase()) {
+            "2.4g", "2.4ghz", "2g" -> "2g"
+            "5ghz", "5g" -> "5g"
+            else -> raw.trim()
+        }
+    }
+
+    private fun readChannelApplyStatusRaw(): String? {
+        return try {
+            val statusPath = "/sdcard/kitsunping_cache/router_channel_apply_response.json"
+            val result = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat $statusPath")).inputStream.bufferedReader().use { it.readText() }
+            if (result.isBlank()) {
+                null
+            } else {
+                onChannelApplyStatusObserved(result)
+                result
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun onChannelApplyStatusObserved(raw: String) {
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return
+        if (!json.optString("status", "").equals("ok", ignoreCase = true)) return
+
+        val ts = json.optLong("ts", 0L)
+        if (ts > 0 && ts <= lastProcessedChannelApplyTs) return
+        if (ts > 0) {
+            lastProcessedChannelApplyTs = ts
+        }
+
+        val appliedChannel = json.optInt("channel", -1).takeIf { it > 0 }
+        val appliedBand = normalizeRouterBand(json.optString("band", ""))
+
+        runOnUiThread {
+            routerSignatureUi = routerSignatureUi.copy(
+                band = if (appliedBand.isNotBlank()) appliedBand else routerSignatureUi.band,
+                channel = appliedChannel?.toString() ?: routerSignatureUi.channel
+            )
+        }
+
+        schedulePostChannelChangeRefresh()
     }
 
     private fun requestNotificationPermissionIfNeeded() {
@@ -764,6 +835,165 @@ class MainActivity : ComponentActivity() {
         }.start()
     }
 
+    private fun runModuleIntegrityCheck() {
+        moduleIntegrityViewVisible = true
+        moduleIntegrityViewLoading = true
+        moduleIntegrityViewReport = "Verifying integrity of module ..."
+        Thread {
+            val output = rootCommandExecutor.runCapture(
+                """
+                MODDIR=/data/adb/modules/Kitsunping
+                STATE_FILE="${'$'}MODDIR/cache/daemon.state"
+                LINK_FILE="${'$'}MODDIR/cache/link_context.state"
+                LOG_FILE="${'$'}MODDIR/logs/daemon.log"
+                SAFE_FLAG="${'$'}MODDIR/cache/daemon.safe_mode"
+                RESCUE_FLAG="${'$'}MODDIR/cache/daemon.rescue_requested"
+                VALIDATION_FAIL_FILE="${'$'}MODDIR/cache/daemon.validation_fail_count"
+                issues=0
+                cause="desconocida"
+                safe_active=0
+
+                print_header() {
+                    echo "========================================"
+                    echo "Kitsunping - Verificacion de integridad"
+                    echo "========================================"
+                }
+
+                check_presence() {
+                    local label="${'$'}1" path="${'$'}2"
+                    if [ -e "${'$'}path" ]; then
+                        echo "[OK] ${'$'}label existe: ${'$'}path"
+                    else
+                        echo "[WARN] ${'$'}label no existe: ${'$'}path"
+                        issues=$((issues + 1))
+                    fi
+                }
+
+                check_format_daemon_state() {
+                    if [ ! -f "${'$'}STATE_FILE" ]; then
+                        echo "[WARN] daemon.state ausente (arranque limpio o fallo de escritura)"
+                        issues=$((issues + 1))
+                        return 0
+                    fi
+                    if grep -q '^[a-z_]*\.[a-z_]*=' "${'$'}STATE_FILE" 2>/dev/null; then
+                        echo "[OK] daemon.state formato dotted key=value valido"
+                    else
+                        echo "[ERROR] daemon.state formato invalido (failsafe trigger)"
+                        echo "       Muestra (primeras lineas):"
+                        sed -n '1,8p' "${'$'}STATE_FILE" | sed 's/^/       /'
+                        issues=$((issues + 1))
+                    fi
+                }
+
+                check_format_link_context() {
+                    if [ ! -f "${'$'}LINK_FILE" ]; then
+                        echo "[WARN] link_context.state ausente"
+                        issues=$((issues + 1))
+                        return 0
+                    fi
+                    if grep -qE '^[a-z_]+=' "${'$'}LINK_FILE" 2>/dev/null; then
+                        echo "[OK] link_context.state formato key=value valido"
+                    else
+                        echo "[ERROR] link_context.state formato invalido"
+                        echo "       Muestra (primeras lineas):"
+                        sed -n '1,8p' "${'$'}LINK_FILE" | sed 's/^/       /'
+                        issues=$((issues + 1))
+                    fi
+                }
+
+                check_writable() {
+                    local path="${'$'}1" label="${'$'}2"
+                    if [ -w "${'$'}path" ]; then
+                        echo "[OK] escribible: ${'$'}label"
+                    else
+                        echo "[WARN] no escribible: ${'$'}label (${ '$'}path)"
+                        issues=$((issues + 1))
+                    fi
+                }
+
+                print_header
+                echo ""
+                if [ -f "${'$'}SAFE_FLAG" ]; then
+                    echo "Estado: SAFE_MODE activo"
+                    echo "Recomendacion: revisar detalle y ejecutar rescue si corresponde"
+                    safe_active=1
+                else
+                    echo "Estado: modo normal"
+                fi
+                if [ -f "${'$'}RESCUE_FLAG" ]; then
+                    echo "Nota: rescue pendiente detectado"
+                fi
+                if [ -f "${'$'}VALIDATION_FAIL_FILE" ]; then
+                    echo "Contador de fallos de validacion: $(cat "${'$'}VALIDATION_FAIL_FILE" 2>/dev/null | tr -d '\r\n')"
+                fi
+
+                echo ""
+                echo "[Archivos criticos]"
+                check_presence "daemon.state" "${'$'}STATE_FILE"
+                check_presence "link_context.state" "${'$'}LINK_FILE"
+                check_presence "daemon.log" "${'$'}LOG_FILE"
+                check_presence "module.prop" "${'$'}MODDIR/module.prop"
+
+                echo ""
+                echo "[Formato]"
+                check_format_daemon_state
+                check_format_link_context
+
+                echo ""
+                echo "[Permisos de escritura]"
+                check_writable "${'$'}MODDIR/cache" "cache dir"
+                check_writable "${'$'}STATE_FILE" "daemon.state"
+                check_writable "${'$'}LINK_FILE" "link_context.state"
+                check_writable "${'$'}MODDIR/module.prop" "module.prop"
+
+                echo ""
+                echo "[Ultimos eventos failsafe]"
+                if [ -f "${'$'}LOG_FILE" ]; then
+                    grep -Ei 'failsafe|safe_mode|rescue|format invalid|cannot write' "${'$'}LOG_FILE" | tail -n 20 || echo "(sin eventos failsafe recientes)"
+                    if grep -Eiq 'STATE_FILE format invalid|daemon\.state format invalid' "${'$'}LOG_FILE"; then
+                        cause="daemon.state corrupto o truncado"
+                    elif grep -Eiq 'LINK_CONTEXT_FILE format invalid|link_context\.state format invalid' "${'$'}LOG_FILE"; then
+                        cause="link_context.state corrupto o truncado"
+                    elif grep -Eiq 'Cannot write to cache directory|cannot write' "${'$'}LOG_FILE"; then
+                        cause="fallo de permisos/escritura en cache"
+                    elif grep -Eiq 'RESCUE TRIGGERED|rescue_requested' "${'$'}LOG_FILE"; then
+                        cause="rescue manual solicitado"
+                    fi
+                else
+                    echo "(daemon.log no encontrado)"
+                fi
+
+                echo ""
+                echo "[Diagnostico de causa]"
+                echo "Causa probable de SAFE_MODE: ${'$'}cause"
+                if [ "${'$'}safe_active" -eq 1 ] && [ "${'$'}issues" -eq 0 ]; then
+                    echo "[POTENCIAL FALSO POSITIVO] safe_mode activo sin fallos actuales"
+                    echo "Sugerencia: revisar si quedo flag stale y reiniciar daemon"
+                fi
+
+                echo ""
+                echo "[Prevencion recomendada]"
+                echo "- Mantener /cache con escritura valida y espacio libre"
+                echo "- Evitar editar daemon.state/link_context.state manualmente"
+                echo "- Si hubo corte abrupto, reiniciar daemon para permitir auto-heal"
+                echo "- Si persiste SAFE_MODE, usar rescue controlado en lugar de reinstalar"
+
+                echo ""
+                if [ "${'$'}issues" -gt 0 ]; then
+                    echo "Resultado: INTEGRIDAD CON ALERTAS (${ '$'}issues)"
+                    exit 2
+                fi
+                echo "Resultado: INTEGRIDAD OK"
+                exit 0
+                """.trimIndent()
+            )
+            runOnUiThread {
+                moduleIntegrityViewLoading = false
+                moduleIntegrityViewReport = output.ifBlank { "no output" }
+            }
+        }.start()
+    }
+
     private fun showRouterLastView() {
         Thread {
             val content = moduleFileGateway.readRouterLastView()
@@ -942,6 +1172,21 @@ class MainActivity : ComponentActivity() {
         val updated = appPolicies.toMutableMap().apply {
             this[pkg] = TargetPolicyRule(profile = profile, priority = priority, enabled = enabled)
         }
+        appPolicies = updated
+        Thread {
+            policyRepository.savePolicies(updated)
+            val reloaded = policyRepository.loadPolicies()
+            runOnUiThread {
+                appPolicies = reloaded
+                schedulePolicyRuntimeSync()
+            }
+        }.start()
+    }
+
+    private fun deleteAppPolicy(packageName: String) {
+        val pkg = packageName.trim().lowercase()
+        if (pkg.isBlank()) return
+        val updated = appPolicies.toMutableMap().apply { remove(pkg) }
         appPolicies = updated
         Thread {
             policyRepository.savePolicies(updated)
@@ -1661,6 +1906,11 @@ class MainActivity : ComponentActivity() {
     private fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled
         uiSettingsStore.saveDeveloperMode(enabled)
+    }
+
+    private fun updateReducedMotion(enabled: Boolean) {
+        reducedMotionEnabled = enabled
+        uiSettingsStore.saveReducedMotionEnabled(enabled)
     }
 
     private fun launchQrScanner() {

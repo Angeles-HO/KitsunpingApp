@@ -59,6 +59,33 @@ data class DaemonRuntimeStatus(
     }
 }
 
+data class ConflictModuleHit(
+    val module: String,
+    val risk: String,
+    val highHits: Int,
+    val mediumHits: Int
+)
+
+data class ConflictStatus(
+    val highestRisk: String,
+    val modulesScanned: Int,
+    val highModules: Int,
+    val mediumModules: Int,
+    val lowModules: Int,
+    val topModules: List<ConflictModuleHit>
+) {
+    companion object {
+        fun empty(): ConflictStatus = ConflictStatus(
+            highestRisk = "none",
+            modulesScanned = 0,
+            highModules = 0,
+            mediumModules = 0,
+            lowModules = 0,
+            topModules = emptyList()
+        )
+    }
+}
+
 data class ModuleSnapshot(
     val policyEvent: PolicyEvent,
     val daemonState: Map<String, String>,
@@ -68,6 +95,7 @@ data class ModuleSnapshot(
     val policyCurrent: String,
     val policyTarget: String,
     val policyRequest: String,
+    val conflictStatus: ConflictStatus,
     val targetState: String,
     val targetStateReason: String,
     val targetStateHistory: List<String>
@@ -82,6 +110,7 @@ data class ModuleSnapshot(
             policyCurrent = "",
             policyTarget = "",
             policyRequest = "",
+            conflictStatus = ConflictStatus.empty(),
             targetState = "IDLE",
             targetStateReason = "",
             targetStateHistory = emptyList()

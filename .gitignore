@@ -1,11 +1,9 @@
 # IntelliJ / Android Studio
 *.iml
-.idea/caches/
-.idea/libraries/
-.idea/workspace.xml
-.idea/modules.xml
-.idea/navEditor.xml
-.idea/assetWizardSettings.xml
+.idea/
+
+# Release artifacts
+results/
 
 # Gradle
 .gradle/

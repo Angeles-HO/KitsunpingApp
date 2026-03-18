@@ -15,6 +15,8 @@ object NotificationHelper {
     private const val NOTIF_ID_STATUS = 1001
     private const val NOTIF_ID_CHANNEL_AVAILABLE = 1002  // M4
     private const val PREFS_NAME = "notification_state"
+    private const val MIN_EVENT_INTERVAL_MS = 8000L
+    private const val DUPLICATE_SUPPRESS_MS = 120000L
 
     fun handleSnapshot(context: Context, snapshot: ModuleSnapshot) {
         if (!canPostNotifications(context)) return
@@ -87,7 +89,13 @@ object NotificationHelper {
         }
         val lastProfile = prefs.getString("profile", "")
         if (currentProfile.isNotBlank() && currentProfile != lastProfile) {
-            notifyEvent(context, "Profile changed", "New profile: $currentProfile")
+            notifyEvent(
+                context = context,
+                title = "Profile changed",
+                text = "New profile: $currentProfile",
+                eventType = "profile",
+                cooldownMs = 10_000L
+            )
             prefs.edit().putString("profile", currentProfile).apply()
         }
 
@@ -95,8 +103,20 @@ object NotificationHelper {
         val lastCalib = prefs.getString("calib", "")
         if (calibState != lastCalib) {
             when {
-                calibState == "running" -> notifyEvent(context, "Calibration", "Calibration iniciada")
-                lastCalib == "running" -> notifyEvent(context, "Calibration", "Calibration finalizada")
+                calibState == "running" -> notifyEvent(
+                    context,
+                    "Calibration",
+                    "Calibration iniciada",
+                    eventType = "calibration",
+                    cooldownMs = 15_000L
+                )
+                lastCalib == "running" -> notifyEvent(
+                    context,
+                    "Calibration",
+                    "Calibration finalizada",
+                    eventType = "calibration",
+                    cooldownMs = 15_000L
+                )
             }
             prefs.edit().putString("calib", calibState).apply()
         }
@@ -110,7 +130,17 @@ object NotificationHelper {
         if (event.isNotBlank() && eventKey != lastEventKey) {
             val mapped = mapEventNotification(event, details)
             if (mapped != null) {
-                notifyEvent(context, mapped.first, mapped.second)
+                notifyEvent(
+                    context = context,
+                    title = mapped.first,
+                    text = mapped.second,
+                    eventType = event.uppercase(),
+                    cooldownMs = when (event.uppercase()) {
+                        "ROUTER_CAPS_DETECTED" -> 300_000L
+                        "PROFILE_CHANGED" -> 20_000L
+                        else -> 20_000L
+                    }
+                )
             }
             prefs.edit()
                 .putString("last_event", event)
@@ -148,18 +178,46 @@ object NotificationHelper {
         }
     }
 
-    private fun notifyEvent(context: Context, title: String, text: String) {
+    private fun notifyEvent(
+        context: Context,
+        title: String,
+        text: String,
+        eventType: String,
+        cooldownMs: Long
+    ) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val normalizedType = eventType.lowercase()
+        val lastGlobal = prefs.getLong("last_event_global_ts", 0L)
+        if (now - lastGlobal < MIN_EVENT_INTERVAL_MS) return
+
+        val keyPrefix = "event_${normalizedType}"
+        val textKey = "${title.trim()}|${text.trim()}"
+        val lastTypeTs = prefs.getLong("${keyPrefix}_ts", 0L)
+        val lastTypeText = prefs.getString("${keyPrefix}_text", "")
+        if (lastTypeText == textKey && now - lastTypeTs < DUPLICATE_SUPPRESS_MS) return
+        if (now - lastTypeTs < cooldownMs) return
+
+        val notificationId = 2000 + (normalizedType.hashCode().let { if (it < 0) -it else it } % 500)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_EVENTS)
             .setSmallIcon(android.R.drawable.stat_notify_error)
             .setContentTitle(title)
             .setContentText(text)
+            .setOnlyAlertOnce(true)
+            .setGroup("kitsunping_events")
             .setAutoCancel(true)
             .build()
 
         runCatching {
             NotificationManagerCompat.from(context)
-                .notify((System.currentTimeMillis() % 100000).toInt(), notification)
+                .notify(notificationId, notification)
         }
+
+        prefs.edit()
+            .putLong("last_event_global_ts", now)
+            .putLong("${keyPrefix}_ts", now)
+            .putString("${keyPrefix}_text", textKey)
+            .apply()
     }
 
     // M4: Show notification when better WiFi channel is available
