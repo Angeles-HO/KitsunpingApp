@@ -2,13 +2,14 @@ package app.kitsunping
 
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import app.kitsunping.data.root.SuProcessLauncher
 
 object RootFileReader {
     private const val MARKER = "__KITSUNPING_READ__"
 
     fun read(path: String): String? {
         return try {
-            val process = ProcessBuilder("su", "-c", "cat ${shQuote(path)}").start()
+            val process = SuProcessLauncher.start("cat ${shQuote(path)}")
             val output = BufferedReader(InputStreamReader(process.inputStream)).use { it.readText() }
             val exit = process.waitFor()
             if (exit == 0) output else null
@@ -19,7 +20,7 @@ object RootFileReader {
 
     fun exists(path: String): Boolean {
         return try {
-            val process = ProcessBuilder("su", "-c", "[ -f ${shQuote(path)} ]").start()
+            val process = SuProcessLauncher.start("[ -f ${shQuote(path)} ]")
             process.waitFor() == 0
         } catch (_: Exception) {
             false
@@ -33,7 +34,7 @@ object RootFileReader {
             } else {
                 "${shQuote(path)}/$pattern"
             }
-            val process = ProcessBuilder("su", "-c", "ls -1 $target 2>/dev/null").start()
+            val process = SuProcessLauncher.start("ls -1 $target 2>/dev/null")
             val output = BufferedReader(InputStreamReader(process.inputStream)).use { it.readText() }
             process.waitFor()
             output.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
@@ -53,7 +54,7 @@ object RootFileReader {
                     append("printf '%s\\n' '$MARKER|END|$path'\n")
                 }
             }
-            val process = ProcessBuilder("su", "-c", script).start()
+            val process = SuProcessLauncher.start(script)
             val output = BufferedReader(InputStreamReader(process.inputStream)).use { it.readText() }
             val exit = process.waitFor()
             if (exit != 0) return paths.associateWith { null }

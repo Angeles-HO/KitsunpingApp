@@ -24,7 +24,7 @@ class RootCommandExecutor {
 
     private fun runSingle(cmd: String, includeCmdLabel: Boolean): String {
         return try {
-            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
+            val proc = SuProcessLauncher.start(cmd)
             val out = proc.inputStream.bufferedReader().use { it.readText() }
             val err = proc.errorStream.bufferedReader().use { it.readText() }
             val rc = proc.waitFor()

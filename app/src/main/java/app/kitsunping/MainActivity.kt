@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.kitsunping.data.files.ModuleFileGateway
 import app.kitsunping.data.root.RootCommandExecutor
+import app.kitsunping.data.root.SuProcessLauncher
 import app.kitsunping.data.settings.UiSettingsStore
 import app.kitsunping.domain.events.PolicyEventDispatcher
 import app.kitsunping.feature.speedtest.SpeedTestRunConfig
@@ -330,7 +331,7 @@ class MainActivity : ComponentActivity() {
                         try {
                             // Read from /sdcard which is writable
                             val cachePath = "/sdcard/kitsunping_cache/router_channel_recommendation.json"
-                            val result = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat $cachePath")).inputStream.bufferedReader().use { it.readText() }
+                            val result = SuProcessLauncher.start("cat $cachePath").inputStream.bufferedReader().use { it.readText() }
                             if (result.isNotBlank()) result else null
                         } catch (e: Exception) {
                             null
@@ -620,7 +621,7 @@ class MainActivity : ComponentActivity() {
     private fun readChannelApplyStatusRaw(): String? {
         return try {
             val statusPath = "/sdcard/kitsunping_cache/router_channel_apply_response.json"
-            val result = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat $statusPath")).inputStream.bufferedReader().use { it.readText() }
+            val result = SuProcessLauncher.start("cat $statusPath").inputStream.bufferedReader().use { it.readText() }
             if (result.isBlank()) {
                 null
             } else {
@@ -1394,6 +1395,13 @@ class MainActivity : ComponentActivity() {
         if (routerIpFromQr.isNotBlank() && routerPairing.routerIp != routerIpFromQr) {
             saveRouterPairingState(routerPairing.copy(routerIp = routerIpFromQr), persistToModule = false)
         }
+
+        // Auto-pair when QR provides both IP and pair code
+        val pairCode = extractPairCode(payload)
+        val effectiveIp = routerIpFromQr.ifBlank { routerPairing.routerIp }
+        if (effectiveIp.isNotBlank() && pairCode.isNotBlank()) {
+            pairRouter(effectiveIp, payload)
+        }
     }
 
     private fun handleIncomingPairIntent(intent: Intent?) {
@@ -1405,7 +1413,7 @@ class MainActivity : ComponentActivity() {
 
     private fun isValidRouterToken(token: String): Boolean {
         if (token.length != 32) return false
-        return token.all { it in '0'..'9' || it in 'a'..'f' }
+        return token.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
     }
 
     private fun postPairValidate(endpoint: String, payload: JSONObject, authToken: String? = null): Pair<Int, String> {
@@ -1510,7 +1518,7 @@ class MainActivity : ComponentActivity() {
     ): Triple<String, Int, String> {
         val endpoints = buildRouterEndpoints(
             routerIp,
-            listOf("/cgi-bin/router-pair-validate")
+            listOf("/cgi-bin/router-pair-validate", "/router_agent/pair_validate")
         )
 
         if (endpoints.isEmpty()) {
