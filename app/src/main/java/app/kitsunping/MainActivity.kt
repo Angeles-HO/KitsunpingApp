@@ -72,6 +72,9 @@ class MainActivity : ComponentActivity() {
     private var moduleIntegrityViewReport by mutableStateOf("Verifying integrity of module ...")
     private var scannedPairPayload by mutableStateOf("")
     private var lowNetworkSimulationEnabled by mutableStateOf(false)
+    private var onnxEnabled by mutableStateOf(true)
+    private var onnxLearningEnabled by mutableStateOf(true)
+    private var onnxUseDefaultModel by mutableStateOf(true)
     private var ipv6CalibrationEnabled by mutableStateOf(false)
     private var granularLatencyEnabled by mutableStateOf(false)
     private var lowNetworkTestOffset by mutableStateOf(0)
@@ -202,6 +205,9 @@ class MainActivity : ComponentActivity() {
         handleIncomingPairIntent(intent)
         latestSnapshot = repository.loadSnapshot()
         lowNetworkSimulationEnabled = loadLowNetworkSimulationState()
+        onnxEnabled = loadOnnxEnabledState()
+        onnxLearningEnabled = loadOnnxLearningEnabledState()
+        onnxUseDefaultModel = loadOnnxUseDefaultModelState()
         ipv6CalibrationEnabled = loadIpv6CalibrationState()
         granularLatencyEnabled = loadGranularLatencyState()
         lowNetworkTestOffset = loadLowNetworkTestOffset()
@@ -305,6 +311,12 @@ class MainActivity : ComponentActivity() {
                     onRequestDeveloperMode = { updateDeveloperMode(it) },
                     lowNetworkSimulationEnabled = lowNetworkSimulationEnabled,
                     onRequestLowNetworkSimulation = { updateLowNetworkSimulation(it) },
+                    onnxEnabled = onnxEnabled,
+                    onRequestOnnxEnabled = { updateOnnxEnabled(it) },
+                    onnxLearningEnabled = onnxLearningEnabled,
+                    onRequestOnnxLearningEnabled = { updateOnnxLearningEnabled(it) },
+                    onnxUseDefaultModel = onnxUseDefaultModel,
+                    onRequestOnnxUseDefaultModel = { updateOnnxUseDefaultModel(it) },
                     ipv6CalibrationEnabled = ipv6CalibrationEnabled,
                     onRequestIpv6Calibration = { updateIpv6Calibration(it) },
                     granularLatencyEnabled = granularLatencyEnabled,
@@ -718,6 +730,63 @@ class MainActivity : ComponentActivity() {
             "resetprop persist.kitsunping.dev_score_divisor 2 || setprop persist.kitsunping.dev_score_divisor 2"
         )
         runRootCommands(commands)
+    }
+
+    private fun loadOnnxEnabledState(): Boolean {
+        val raw = rootCommandExecutor.runCapture(
+            "getprop persist.kitsunping.onnx.enable 2>/dev/null | tr -d '\\r\\n'"
+        )
+        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
+        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+    }
+
+    private fun updateOnnxEnabled(enabled: Boolean) {
+        onnxEnabled = enabled
+        val value = if (enabled) "1" else "0"
+        runRootCommands(
+            listOf(
+                "resetprop persist.kitsunping.onnx.enable $value || setprop persist.kitsunping.onnx.enable $value",
+                "resetprop kitsunping.onnx.enable $value || setprop kitsunping.onnx.enable $value"
+            )
+        )
+    }
+
+    private fun loadOnnxLearningEnabledState(): Boolean {
+        val raw = rootCommandExecutor.runCapture(
+            "getprop persist.kitsunping.onnx.learning_enable 2>/dev/null | tr -d '\\r\\n'"
+        )
+        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
+        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+    }
+
+    private fun updateOnnxLearningEnabled(enabled: Boolean) {
+        onnxLearningEnabled = enabled
+        val value = if (enabled) "1" else "0"
+        runRootCommands(
+            listOf(
+                "resetprop persist.kitsunping.onnx.learning_enable $value || setprop persist.kitsunping.onnx.learning_enable $value",
+                "resetprop kitsunping.onnx.learning_enable $value || setprop kitsunping.onnx.learning_enable $value"
+            )
+        )
+    }
+
+    private fun loadOnnxUseDefaultModelState(): Boolean {
+        val raw = rootCommandExecutor.runCapture(
+            "getprop persist.kitsunping.onnx.use_default_model 2>/dev/null | tr -d '\\r\\n'"
+        )
+        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
+        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+    }
+
+    private fun updateOnnxUseDefaultModel(enabled: Boolean) {
+        onnxUseDefaultModel = enabled
+        val value = if (enabled) "1" else "0"
+        runRootCommands(
+            listOf(
+                "resetprop persist.kitsunping.onnx.use_default_model $value || setprop persist.kitsunping.onnx.use_default_model $value",
+                "resetprop kitsunping.onnx.use_default_model $value || setprop kitsunping.onnx.use_default_model $value"
+            )
+        )
     }
 
     private fun loadLowNetworkTestOffset(): Int {

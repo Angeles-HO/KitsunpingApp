@@ -10,6 +10,7 @@ class ModuleRepository(context: Context) {
         val reads = RootFileReader.readMany(
             listOf(
                 PATH_POLICY_EVENT,
+                PATH_CALIBRATE_STATE,
                 PATH_DAEMON_STATE,
                 PATH_LAST_EVENT,
                 PATH_RESULTS_ENV,
@@ -25,6 +26,14 @@ class ModuleRepository(context: Context) {
 
         val policyEventJson = reads[PATH_POLICY_EVENT]
         val policyEvent = PolicyEvent.fromJson(policyEventJson) ?: store.load()
+        val calibrateState = reads[PATH_CALIBRATE_STATE]
+            ?.trim()
+            ?.takeIf { it in CALIBRATE_STATES }
+        val currentPolicyEvent = if (calibrateState != null) {
+            policyEvent.copy(calibrateState = calibrateState)
+        } else {
+            policyEvent
+        }
 
         val daemonState = parseKeyValue(reads[PATH_DAEMON_STATE]).toMutableMap()
         enrichGatewayFields(daemonState, reads[PATH_PROC_NET_ROUTE].orEmpty())
@@ -50,7 +59,7 @@ class ModuleRepository(context: Context) {
             ?: emptyList()
 
         return ModuleSnapshot(
-            policyEvent = policyEvent,
+            policyEvent = currentPolicyEvent,
             daemonState = daemonState,
             daemonRuntime = DaemonRuntimeStatus.empty(),
             lastEvent = lastEvent,
@@ -151,7 +160,8 @@ class ModuleRepository(context: Context) {
 
     private fun normalizeTargetState(rawState: String): String {
         return when (rawState.trim().uppercase()) {
-            "IDLE", "APP_OVERRIDE", "NETWORK_DECISION", "POLICY_APPLIED" -> rawState.trim().uppercase()
+            "IDLE", "APP_OVERRIDE", "NETWORK_DECISION", "REQUEST_WRITTEN" -> rawState.trim().uppercase()
+            "POLICY_APPLIED" -> "REQUEST_WRITTEN"
             else -> "IDLE"
         }
     }
@@ -235,6 +245,7 @@ class ModuleRepository(context: Context) {
         private const val PATH_PROC_NET_ROUTE = "/proc/net/route"
 
         const val PATH_POLICY_EVENT = "$PATH_CACHE/policy.event.json"
+        const val PATH_CALIBRATE_STATE = "$PATH_CACHE/calibrate.state"
         const val PATH_DAEMON_STATE = "$PATH_CACHE/daemon.state"
         const val PATH_LAST_EVENT = "$PATH_CACHE/event.last.json"
         const val PATH_POLICY_CURRENT = "$PATH_CACHE/policy.current"
@@ -244,5 +255,15 @@ class ModuleRepository(context: Context) {
         const val PATH_CONFLICTS_STATE = "$PATH_CACHE/conflicts.state"
         const val PATH_CONFLICTS_REPORT = "$PATH_LOGS/conflicts_report.log"
         const val PATH_RESULTS_ENV = "$PATH_LOGS/results.env"
+
+        private val CALIBRATE_STATES = setOf(
+            "idle",
+            "running",
+            "completed",
+            "postponed",
+            "aborted",
+            "timed_out",
+            "failed"
+        )
     }
 }

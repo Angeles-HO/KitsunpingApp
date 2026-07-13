@@ -1100,7 +1100,8 @@ private fun resolveRuleState(
 
 private fun normalizeTargetTransitionState(state: String): String {
     return when (state.trim().uppercase(Locale.ROOT)) {
-        "IDLE", "APP_OVERRIDE", "NETWORK_DECISION", "POLICY_APPLIED" -> state.trim().uppercase(Locale.ROOT)
+        "IDLE", "APP_OVERRIDE", "NETWORK_DECISION", "REQUEST_WRITTEN" -> state.trim().uppercase(Locale.ROOT)
+        "POLICY_APPLIED" -> "REQUEST_WRITTEN"
         else -> "IDLE"
     }
 }
@@ -1110,7 +1111,7 @@ private fun targetTransitionDisplayLabel(state: String): String {
         "IDLE" -> "IDLE"
         "APP_OVERRIDE" -> "APP_OVERRIDE"
         "NETWORK_DECISION" -> "NETWORK_DECISION"
-        "POLICY_APPLIED" -> "POLICY_APPLIED"
+        "REQUEST_WRITTEN" -> "REQUEST_WRITTEN"
         else -> "IDLE"
     }
 }

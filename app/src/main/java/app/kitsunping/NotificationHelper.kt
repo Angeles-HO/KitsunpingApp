@@ -110,10 +110,31 @@ object NotificationHelper {
                     eventType = "calibration",
                     cooldownMs = 15_000L
                 )
-                lastCalib == "running" -> notifyEvent(
+                calibState == "completed" -> notifyEvent(
                     context,
                     "Calibration",
-                    "Calibration finalizada",
+                    "Calibration completada",
+                    eventType = "calibration",
+                    cooldownMs = 15_000L
+                )
+                calibState == "aborted" -> notifyEvent(
+                    context,
+                    "Calibration",
+                    "Calibration cancelada",
+                    eventType = "calibration",
+                    cooldownMs = 15_000L
+                )
+                calibState == "failed" -> notifyEvent(
+                    context,
+                    "Calibration",
+                    "Calibration fallida",
+                    eventType = "calibration",
+                    cooldownMs = 15_000L
+                )
+                calibState == "timed_out" -> notifyEvent(
+                    context,
+                    "Calibration",
+                    "Calibration agotó el tiempo",
                     eventType = "calibration",
                     cooldownMs = 15_000L
                 )

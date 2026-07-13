@@ -135,8 +135,10 @@ fun SettingsThemePanel(
 @Composable
 fun SettingsModulePanel(
     bootCustomProfile: String,
+    onnxEnabled: Boolean,
     ipv6CalibrationEnabled: Boolean,
     granularLatencyEnabled: Boolean,
+    onRequestOnnxEnabled: (Boolean) -> Unit,
     onRequestBootCustomProfile: (String) -> Unit,
     onRequestIpv6Calibration: (Boolean) -> Unit,
     onRequestGranularLatency: (Boolean) -> Unit
@@ -169,6 +171,12 @@ fun SettingsModulePanel(
                 onSelect = onRequestBootCustomProfile
             )
 
+            SettingsToggleRow(
+                label = "ONNX adaptativo",
+                checked = onnxEnabled,
+                onCheckedChange = onRequestOnnxEnabled
+            )
+
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
             SettingsToggleRow(
@@ -195,10 +203,14 @@ fun SettingsDeveloperPanel(
     developerMode: Boolean,
     reducedMotionEnabled: Boolean,
     lowNetworkSimulationEnabled: Boolean,
+    onnxLearningEnabled: Boolean,
+    onnxUseDefaultModel: Boolean,
     lowNetworkTestOffset: Int,
     routerFiles: List<String>,
     onRequestDeveloperMode: (Boolean) -> Unit,
     onRequestLowNetworkSimulation: (Boolean) -> Unit,
+    onRequestOnnxLearningEnabled: (Boolean) -> Unit,
+    onRequestOnnxUseDefaultModel: (Boolean) -> Unit,
     onRequestLowNetworkTestOffset: (Int) -> Unit,
     onRequestCheckDaemonPid: () -> Unit,
     onRequestRefreshRouterFiles: () -> Unit,
@@ -247,6 +259,18 @@ fun SettingsDeveloperPanel(
                     label = "Simular red baja (divisor=2)",
                     checked = lowNetworkSimulationEnabled,
                     onCheckedChange = onRequestLowNetworkSimulation
+                )
+
+                SettingsToggleRow(
+                    label = "Aprendizaje ONNX",
+                    checked = onnxLearningEnabled,
+                    onCheckedChange = onRequestOnnxLearningEnabled
+                )
+
+                SettingsToggleRow(
+                    label = "Usar modelo ONNX por defecto",
+                    checked = onnxUseDefaultModel,
+                    onCheckedChange = onRequestOnnxUseDefaultModel
                 )
 
                 Row(
