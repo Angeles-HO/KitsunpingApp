@@ -25,7 +25,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.kitsunping.data.files.ModuleFileGateway
+import app.kitsunping.data.root.BooleanRootPropSpec
 import app.kitsunping.data.root.RootCommandExecutor
+import app.kitsunping.data.root.RootBooleanPropStore
 import app.kitsunping.data.root.SuProcessLauncher
 import app.kitsunping.data.settings.UiSettingsStore
 import app.kitsunping.domain.events.PolicyEventDispatcher
@@ -45,6 +47,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var repository: ModuleRepository
     private lateinit var uiSettingsStore: UiSettingsStore
     private lateinit var rootCommandExecutor: RootCommandExecutor
+    private lateinit var rootBooleanPropStore: RootBooleanPropStore
     private lateinit var moduleFileGateway: ModuleFileGateway
     private lateinit var targetPolicyModelStore: TargetPolicyModelStore
     private lateinit var policyRepository: PolicyRepository
@@ -189,6 +192,7 @@ class MainActivity : ComponentActivity() {
         repository = ModuleRepository(this)
         uiSettingsStore = UiSettingsStore(this)
         rootCommandExecutor = RootCommandExecutor()
+        rootBooleanPropStore = RootBooleanPropStore(rootCommandExecutor, MODULE_ROOT)
         moduleFileGateway = ModuleFileGateway(MODULE_ROOT)
         targetPolicyModelStore = TargetPolicyModelStore(this)
         policyRepository = PolicyRepository(targetPolicyModelStore, moduleFileGateway, rootCommandExecutor)
@@ -717,76 +721,42 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun loadLowNetworkSimulationState(): Boolean {
-        val raw = rootCommandExecutor.runCapture("getprop persist.kitsunping.dev_score_sim_enable 2>/dev/null | tr -d '\\r\\n'")
-        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
-        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+        return rootBooleanPropStore.read(PROP_LOW_NETWORK_SIMULATION)
     }
 
     private fun updateLowNetworkSimulation(enabled: Boolean) {
         lowNetworkSimulationEnabled = enabled
-        val enableValue = if (enabled) "1" else "0"
-        val commands = listOf(
-            "resetprop persist.kitsunping.dev_score_sim_enable $enableValue || setprop persist.kitsunping.dev_score_sim_enable $enableValue",
+        val commands = rootBooleanPropStore.writeCommands(PROP_LOW_NETWORK_SIMULATION, enabled) + listOf(
             "resetprop persist.kitsunping.dev_score_divisor 2 || setprop persist.kitsunping.dev_score_divisor 2"
         )
         runRootCommands(commands)
     }
 
     private fun loadOnnxEnabledState(): Boolean {
-        val raw = rootCommandExecutor.runCapture(
-            "getprop persist.kitsunping.onnx.enable 2>/dev/null | tr -d '\\r\\n'"
-        )
-        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
-        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+        return rootBooleanPropStore.read(PROP_ONNX_ENABLED)
     }
 
     private fun updateOnnxEnabled(enabled: Boolean) {
         onnxEnabled = enabled
-        val value = if (enabled) "1" else "0"
-        runRootCommands(
-            listOf(
-                "resetprop persist.kitsunping.onnx.enable $value || setprop persist.kitsunping.onnx.enable $value",
-                "resetprop kitsunping.onnx.enable $value || setprop kitsunping.onnx.enable $value"
-            )
-        )
+        runRootCommands(rootBooleanPropStore.writeCommands(PROP_ONNX_ENABLED, enabled))
     }
 
     private fun loadOnnxLearningEnabledState(): Boolean {
-        val raw = rootCommandExecutor.runCapture(
-            "getprop persist.kitsunping.onnx.learning_enable 2>/dev/null | tr -d '\\r\\n'"
-        )
-        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
-        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+        return rootBooleanPropStore.read(PROP_ONNX_LEARNING_ENABLED)
     }
 
     private fun updateOnnxLearningEnabled(enabled: Boolean) {
         onnxLearningEnabled = enabled
-        val value = if (enabled) "1" else "0"
-        runRootCommands(
-            listOf(
-                "resetprop persist.kitsunping.onnx.learning_enable $value || setprop persist.kitsunping.onnx.learning_enable $value",
-                "resetprop kitsunping.onnx.learning_enable $value || setprop kitsunping.onnx.learning_enable $value"
-            )
-        )
+        runRootCommands(rootBooleanPropStore.writeCommands(PROP_ONNX_LEARNING_ENABLED, enabled))
     }
 
     private fun loadOnnxUseDefaultModelState(): Boolean {
-        val raw = rootCommandExecutor.runCapture(
-            "getprop persist.kitsunping.onnx.use_default_model 2>/dev/null | tr -d '\\r\\n'"
-        )
-        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
-        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+        return rootBooleanPropStore.read(PROP_ONNX_USE_DEFAULT_MODEL)
     }
 
     private fun updateOnnxUseDefaultModel(enabled: Boolean) {
         onnxUseDefaultModel = enabled
-        val value = if (enabled) "1" else "0"
-        runRootCommands(
-            listOf(
-                "resetprop persist.kitsunping.onnx.use_default_model $value || setprop persist.kitsunping.onnx.use_default_model $value",
-                "resetprop kitsunping.onnx.use_default_model $value || setprop kitsunping.onnx.use_default_model $value"
-            )
-        )
+        runRootCommands(rootBooleanPropStore.writeCommands(PROP_ONNX_USE_DEFAULT_MODEL, enabled))
     }
 
     private fun loadLowNetworkTestOffset(): Int {
@@ -800,35 +770,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun loadIpv6CalibrationState(): Boolean {
-        val raw = rootCommandExecutor.runCapture("getprop persist.kitsunping.calibrate_ipv6_enable 2>/dev/null | tr -d '\\r\\n'")
-        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
-        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+        return rootBooleanPropStore.read(PROP_IPV6_CALIBRATION)
     }
 
     private fun updateIpv6Calibration(enabled: Boolean) {
         ipv6CalibrationEnabled = enabled
-        val value = if (enabled) "1" else "0"
-        runRootCommands(
-            listOf(
-                "resetprop persist.kitsunping.calibrate_ipv6_enable $value || setprop persist.kitsunping.calibrate_ipv6_enable $value"
-            )
-        )
+        runRootCommands(rootBooleanPropStore.writeCommands(PROP_IPV6_CALIBRATION, enabled))
     }
 
     private fun loadGranularLatencyState(): Boolean {
-        val raw = rootCommandExecutor.runCapture("getprop persist.kitsunping.calibrate_granular_latency_enable 2>/dev/null | tr -d '\\r\\n'")
-        val token = raw.lineSequence().lastOrNull()?.trim().orEmpty()
-        return token == "1" || token.equals("true", ignoreCase = true) || token.equals("on", ignoreCase = true)
+        return rootBooleanPropStore.read(PROP_GRANULAR_LATENCY)
     }
 
     private fun updateGranularLatency(enabled: Boolean) {
         granularLatencyEnabled = enabled
-        val value = if (enabled) "1" else "0"
-        runRootCommands(
-            listOf(
-                "resetprop persist.kitsunping.calibrate_granular_latency_enable $value || setprop persist.kitsunping.calibrate_granular_latency_enable $value"
-            )
-        )
+        runRootCommands(rootBooleanPropStore.writeCommands(PROP_GRANULAR_LATENCY, enabled))
     }
 
     private fun updateLowNetworkTestOffset(value: Int) {
@@ -2037,6 +1993,42 @@ class MainActivity : ComponentActivity() {
         private const val KEY_ROUTER_ID = "router_id"
         private const val KEY_ROUTER_PAIRED = "router_paired"
         private const val KEY_ROUTER_STATUS_SEQ = "router_status_seq"
+
+        private val PROP_LOW_NETWORK_SIMULATION = BooleanRootPropSpec(
+            persistProp = "persist.kitsunping.dev_score_sim_enable",
+            defaultValue = false
+        )
+
+        private val PROP_ONNX_ENABLED = BooleanRootPropSpec(
+            persistProp = "persist.kitsunping.onnx.enable",
+            runtimeProp = "kitsunping.onnx.enable",
+            defaultValue = true,
+            syncSystemProp = true
+        )
+
+        private val PROP_ONNX_LEARNING_ENABLED = BooleanRootPropSpec(
+            persistProp = "persist.kitsunping.onnx.learning_enable",
+            runtimeProp = "kitsunping.onnx.learning_enable",
+            defaultValue = true,
+            syncSystemProp = true
+        )
+
+        private val PROP_ONNX_USE_DEFAULT_MODEL = BooleanRootPropSpec(
+            persistProp = "persist.kitsunping.onnx.use_default_model",
+            runtimeProp = "kitsunping.onnx.use_default_model",
+            defaultValue = true,
+            syncSystemProp = true
+        )
+
+        private val PROP_IPV6_CALIBRATION = BooleanRootPropSpec(
+            persistProp = "persist.kitsunping.calibrate_ipv6_enable",
+            defaultValue = false
+        )
+
+        private val PROP_GRANULAR_LATENCY = BooleanRootPropSpec(
+            persistProp = "persist.kitsunping.calibrate_granular_latency_enable",
+            defaultValue = false
+        )
     }
 }
 

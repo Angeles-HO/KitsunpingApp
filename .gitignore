@@ -34,3 +34,5 @@ keystore.properties
 *.ap_
 *.dex
 output.json
+.claude/skills/android-adb
+skills-lock.json
