@@ -202,12 +202,14 @@ fun SettingsModulePanel(
 fun SettingsDeveloperPanel(
     developerMode: Boolean,
     reducedMotionEnabled: Boolean,
+    foregroundCpusetExperimentalEnabled: Boolean,
     lowNetworkSimulationEnabled: Boolean,
     onnxLearningEnabled: Boolean,
     onnxUseDefaultModel: Boolean,
     lowNetworkTestOffset: Int,
     routerFiles: List<String>,
     onRequestDeveloperMode: (Boolean) -> Unit,
+    onRequestForegroundCpusetExperimental: (Boolean) -> Unit,
     onRequestLowNetworkSimulation: (Boolean) -> Unit,
     onRequestOnnxLearningEnabled: (Boolean) -> Unit,
     onRequestOnnxUseDefaultModel: (Boolean) -> Unit,
@@ -246,6 +248,29 @@ fun SettingsDeveloperPanel(
             )
 
             if (developerMode) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                Text(
+                    text = "Foreground experimental",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                SettingsToggleRow(
+                    label = "Usar cpuset experimental",
+                    checked = foregroundCpusetExperimentalEnabled,
+                    onCheckedChange = onRequestForegroundCpusetExperimental
+                )
+                Text(
+                    text = if (foregroundCpusetExperimentalEnabled) {
+                        "Experimental: puede reducir trabajo del selector; ante ambigüedad vuelve a dumpsys y puede tardar más en detectar la app abierta. Se aplica al reiniciar el sidecar."
+                    } else {
+                        "Predeterminado: usa dumpsys para el uso cotidiano."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                 // ── Simulación de red ──

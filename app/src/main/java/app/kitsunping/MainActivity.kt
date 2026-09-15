@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
     private var appThemeMode by mutableStateOf(AppThemeMode.KITSUNPING)
     private var reducedMotionEnabled by mutableStateOf(false)
     private var developerMode by mutableStateOf(false)
+    private var foregroundCpusetExperimentalEnabled by mutableStateOf(false)
     private var routerPairing by mutableStateOf(RouterPairingState())
     private var routerSignatureUi by mutableStateOf(RouterSignatureUi())
     private var installedApps by mutableStateOf<List<InstalledAppEntry>>(emptyList())
@@ -192,6 +193,7 @@ class MainActivity : ComponentActivity() {
         repository = ModuleRepository(this)
         uiSettingsStore = UiSettingsStore(this)
         rootCommandExecutor = RootCommandExecutor()
+        requestRootAccessOnLaunch()
         rootBooleanPropStore = RootBooleanPropStore(rootCommandExecutor, MODULE_ROOT)
         moduleFileGateway = ModuleFileGateway(MODULE_ROOT)
         targetPolicyModelStore = TargetPolicyModelStore(this)
@@ -204,6 +206,7 @@ class MainActivity : ComponentActivity() {
         appThemeMode = uiSettingsStore.loadThemeMode()
         reducedMotionEnabled = uiSettingsStore.loadReducedMotionEnabled()
         developerMode = uiSettingsStore.loadDeveloperMode()
+        foregroundCpusetExperimentalEnabled = loadForegroundCpusetExperimentalState()
         routerPairing = loadRouterPairingState()
         routerStatusSeq = loadRouterStatusSeq()
         handleIncomingPairIntent(intent)
@@ -313,6 +316,8 @@ class MainActivity : ComponentActivity() {
                     onRequestThemeMode = { updateThemeMode(it) },
                     onRequestReducedMotion = { updateReducedMotion(it) },
                     onRequestDeveloperMode = { updateDeveloperMode(it) },
+                    foregroundCpusetExperimentalEnabled = foregroundCpusetExperimentalEnabled,
+                    onRequestForegroundCpusetExperimental = { updateForegroundCpusetExperimental(it) },
                     lowNetworkSimulationEnabled = lowNetworkSimulationEnabled,
                     onRequestLowNetworkSimulation = { updateLowNetworkSimulation(it) },
                     onnxEnabled = onnxEnabled,
@@ -732,6 +737,29 @@ class MainActivity : ComponentActivity() {
         runRootCommands(commands)
     }
 
+    private fun loadForegroundCpusetExperimentalState(): Boolean {
+        val contents = moduleFileGateway.read("$MODULE_CACHE_DIR/kitsunpingd.env")
+        return contents.lineSequence().any { it.trim() == "KITSUNPINGD_FOREGROUND_SOURCE=cpuset_experimental" }
+    }
+
+    private fun updateForegroundCpusetExperimental(enabled: Boolean) {
+        foregroundCpusetExperimentalEnabled = enabled
+        val command = if (enabled) {
+            """
+            cache_dir=$MODULE_CACHE_DIR
+            env_file=${'$'}cache_dir/kitsunpingd.env
+            tmp_file=${'$'}env_file.tmp.${'$'}${'$'}
+            mkdir -p "${'$'}cache_dir" &&
+            (umask 077; printf '%s\n' 'KITSUNPINGD_FOREGROUND_SOURCE=cpuset_experimental' 'KITSUNPINGD_FOREGROUND_DEBUG=1' > "${'$'}tmp_file") &&
+            mv -f "${'$'}tmp_file" "${'$'}env_file" &&
+            chmod 0600 "${'$'}env_file"
+            """.trimIndent()
+        } else {
+            "rm -f $MODULE_CACHE_DIR/kitsunpingd.env $MODULE_CACHE_DIR/foreground.cpuset.metrics"
+        }
+        runRootCommands(listOf(command))
+    }
+
     private fun loadOnnxEnabledState(): Boolean {
         return rootBooleanPropStore.read(PROP_ONNX_ENABLED)
     }
@@ -836,6 +864,12 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "Fallo al enviar: ${e.message}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun requestRootAccessOnLaunch() {
+        Thread {
+            rootCommandExecutor.runCapture("id >/dev/null 2>&1")
+        }.start()
     }
 
     private fun runRootCommands(cmds: List<String>) {
